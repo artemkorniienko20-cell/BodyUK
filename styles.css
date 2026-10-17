@@ -486,3 +486,180 @@ h1 {
   flex-direction: column;
   gap: 10px;
 }
+
+/* =========================================================================
+   ІНТЕРФЕЙС КЕРУВАННЯ ДЖОЙСТИКОМ / ГЕЙМПАДОМ (#joystick-hud)
+   ========================================================================= */
+.joystick-hud {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.joy-top-bar {
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.joy-top-btn {
+  background: rgba(10, 14, 20, 0.78);
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 212, 59, 0.45);
+  border-radius: 5px;
+  padding: 7px 11px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.14s ease, transform 0.1s ease;
+}
+
+.joy-top-btn:active,
+.joy-top-btn:hover {
+  background: rgba(255, 212, 59, 0.28);
+  border-color: #ffd43b;
+  transform: scale(0.96);
+}
+
+.gamepad-pill {
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px dashed rgba(74, 222, 128, 0.55);
+  color: #4ade80;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 4px;
+  letter-spacing: 0.8px;
+}
+
+.joy-left-Side {
+  position: absolute;
+  left: 34px;
+  bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.joy-right-side {
+  position: absolute;
+  right: 34px;
+  bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.joy-lean-row,
+.joy-utility-row,
+.joy-combat-cluster {
+  display: flex;
+  gap: 8px;
+}
+
+.joy-stick-zone {
+  position: relative;
+  width: 146px;
+  height: 146px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 212, 59, 0.08) 0%, rgba(10, 14, 20, 0.65) 75%);
+  border: 2px solid rgba(255, 212, 59, 0.42);
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.65), inset 0 0 18px rgba(255, 212, 59, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+}
+
+.joy-stick-ring {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  pointer-events: none;
+}
+
+.joy-stick-knob {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffd43b 0%, #ca8a04 75%, #854d0e 100%);
+  border: 2px solid #fef08a;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.75), 0 0 12px rgba(255, 212, 59, 0.45);
+  color: #090b0f;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transition: transform 0.04s linear;
+}
+
+.joy-stick-caption {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(226, 232, 240, 0.8);
+  letter-spacing: 0.9px;
+  background: rgba(6, 9, 13, 0.65);
+  padding: 3px 8px;
+  border-radius: 3px;
+}
+
+.joy-action-btn {
+  background: rgba(12, 16, 23, 0.82);
+  color: #f8fafc;
+  border: 1.5px solid rgba(255, 212, 59, 0.5);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  transition: all 0.12s ease;
+}
+
+.joy-action-btn.small {
+  padding: 7px 10px;
+  font-size: 10.5px;
+}
+
+.joy-action-btn.fire-btn {
+  background: linear-gradient(180deg, rgba(220, 38, 38, 0.88) 0%, rgba(153, 27, 27, 0.92) 100%);
+  border-color: #f87171;
+  padding: 12px 18px;
+  font-size: 13px;
+  box-shadow: 0 0 18px rgba(220, 38, 38, 0.45);
+}
+
+.joy-action-btn.aim-btn.active,
+.joy-action-btn.active {
+  background: rgba(255, 212, 59, 0.35);
+  border-color: #ffd43b;
+  color: #ffd43b;
+}
+
+.joy-action-btn:active {
+  transform: scale(0.94);
+}
+

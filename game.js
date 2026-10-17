@@ -97,6 +97,14 @@ class BodycamSimulator {
     this.walkCycle = 0;
     this.stepAccum = 0;
 
+    // Режим керування: 'pc' (Клавіатура WASD + Миша) або 'joystick' (Екранні джойстики + Фізичний геймпад Xbox/PS)
+    this.inputMode = 'pc';
+    this.joyLeftVec = new THREE.Vector2(0, 0);
+    this.joyRightVec = new THREE.Vector2(0, 0);
+    this.joyFiring = false;
+    this.joyFireTimer = 0;
+    this.prevGamepadButtons = {};
+
     // Бійці на карті (союзники SWAT та вороги OPFOR) і гранати
     this.bots = [];
     this.activeGrenades = [];
@@ -107,6 +115,7 @@ class BodycamSimulator {
     this.updateOSDLabels();
     this.bindEvents();
     this.bindUI();
+    this.bindJoystickControls();
 
     this.clock = new THREE.Clock();
     this.animate = this.animate.bind(this);
@@ -602,6 +611,76 @@ class BodycamSimulator {
     document.getElementById('mode-dm-btn').classList.toggle('active', mode === 'dm');
   }
 
+  /**
+   * Перемикання типу керування: 'pc' (Клавіатура WASD + Миша) або 'joystick' (Екранні стіки + Геймпад)
+   */
+  setInputMode(mode) {
+    this.inputMode = mode === 'joystick' ? 'joystick' : 'pc';
+
+    const pcBtn = document.getElementById('input-pc-btn');
+    const joyBtn = document.getElementById('input-joystick-btn');
+    const drawerInputBtn = document.getElementById('drawer-toggle-input-btn');
+    const joyHud = document.getElementById('joystick-hud');
+    const whisper = document.getElementById('controls-whisper');
+
+    if (pcBtn) pcBtn.classList.toggle('active', this.inputMode === 'pc');
+    if (joyBtn) joyBtn.classList.toggle('active', this.inputMode === 'joystick');
+    if (drawerInputBtn) {
+      drawerInputBtn.textContent = this.inputMode === 'joystick'
+        ? 'КЕРУВАННЯ: 🎮 ДЖОЙСТИК (СТІКИ / ГЕЙМПАД)'
+        : "КЕРУВАННЯ: 💻 КОМП'ЮТЕР (КЛАВІАТУРА+МИША)";
+    }
+
+    if (this.inputMode === 'joystick') {
+      if (document.pointerLockElement) document.exitPointerLock();
+      this.canvas.style.cursor = 'default';
+      if (this.isRunning && !this.opticsMenuOpen && joyHud) {
+        joyHud.classList.remove('hidden');
+      }
+      if (whisper) whisper.classList.add('hidden');
+    } else {
+      this.canvas.style.cursor = 'crosshair';
+      if (joyHud) joyHud.classList.add('hidden');
+      if (whisper) whisper.classList.remove('hidden');
+      this.joyLeftVec.set(0, 0);
+      this.joyRightVec.set(0, 0);
+      this.joyFiring = false;
+    }
+  }
+
+  /**
+   * Спільна математика вільного прицілювання (Free-Aim) для миші (ПК) та правого джойстика
+   */
+  applyLookDelta(dx, dy) {
+    this.mouseDelta.set(dx * 18.0, dy * 18.0);
+
+    const maxFreeYaw = (this.isAiming ? 0.075 : 0.24) * this.freeAimScale;
+    const maxFreePitch = (this.isAiming ? 0.065 : 0.17) * this.freeAimScale;
+
+    this.weaponAimYaw -= dx;
+    this.weaponAimPitch -= dy;
+
+    if (Math.abs(this.weaponAimYaw) > maxFreeYaw) {
+      const overflow = this.weaponAimYaw - Math.sign(this.weaponAimYaw) * maxFreeYaw;
+      this.bodyYaw += overflow;
+      this.weaponAimYaw = Math.sign(this.weaponAimYaw) * maxFreeYaw;
+    }
+
+    if (Math.abs(this.weaponAimPitch) > maxFreePitch) {
+      const overflow = this.weaponAimPitch - Math.sign(this.weaponAimPitch) * maxFreePitch;
+      this.bodyPitch = THREE.MathUtils.clamp(this.bodyPitch + overflow, -1.15, 1.15);
+      this.weaponAimPitch = Math.sign(this.weaponAimPitch) * maxFreePitch;
+    }
+
+    this.bodyYaw += this.weaponAimYaw * 0.14;
+    this.weaponAimYaw *= 0.86;
+    this.bodyPitch = THREE.MathUtils.clamp(this.bodyPitch + this.weaponAimPitch * 0.12, -1.15, 1.15);
+    this.weaponAimPitch *= 0.88;
+
+    this.weaponLagYaw += dx * 0.45;
+    this.weaponLagPitch += dy * 0.45;
+  }
+
   updateOSDLabels() {
     const modeLabel = document.getElementById('axon-mode-label');
     const mapLabel = document.getElementById('axon-map-label');
@@ -709,43 +788,16 @@ class BodycamSimulator {
     });
 
     window.addEventListener('mousemove', (e) => {
+      if (this.inputMode !== 'pc') return;
       if (!this.isRunning || this.isDead || this.opticsMenuOpen) return;
       if (document.pointerLockElement !== this.canvas) return;
 
       const sens = this.isAiming ? 0.0014 : 0.0021;
-      const dx = e.movementX * sens;
-      const dy = e.movementY * sens;
-
-      this.mouseDelta.set(dx * 18.0, dy * 18.0);
-
-      const maxFreeYaw = (this.isAiming ? 0.075 : 0.24) * this.freeAimScale;
-      const maxFreePitch = (this.isAiming ? 0.065 : 0.17) * this.freeAimScale;
-
-      this.weaponAimYaw -= dx;
-      this.weaponAimPitch -= dy;
-
-      if (Math.abs(this.weaponAimYaw) > maxFreeYaw) {
-        const overflow = this.weaponAimYaw - Math.sign(this.weaponAimYaw) * maxFreeYaw;
-        this.bodyYaw += overflow;
-        this.weaponAimYaw = Math.sign(this.weaponAimYaw) * maxFreeYaw;
-      }
-
-      if (Math.abs(this.weaponAimPitch) > maxFreePitch) {
-        const overflow = this.weaponAimPitch - Math.sign(this.weaponAimPitch) * maxFreePitch;
-        this.bodyPitch = THREE.MathUtils.clamp(this.bodyPitch + overflow, -1.15, 1.15);
-        this.weaponAimPitch = Math.sign(this.weaponAimPitch) * maxFreePitch;
-      }
-
-      this.bodyYaw += this.weaponAimYaw * 0.14;
-      this.weaponAimYaw *= 0.86;
-      this.bodyPitch = THREE.MathUtils.clamp(this.bodyPitch + this.weaponAimPitch * 0.12, -1.15, 1.15);
-      this.weaponAimPitch *= 0.88;
-
-      this.weaponLagYaw += dx * 0.45;
-      this.weaponLagPitch += dy * 0.45;
+      this.applyLookDelta(e.movementX * sens, e.movementY * sens);
     });
 
     window.addEventListener('mousedown', (e) => {
+      if (this.inputMode !== 'pc') return;
       if (!this.isRunning || this.isDead || this.opticsMenuOpen) return;
       if (document.pointerLockElement !== this.canvas) {
         this.canvas.requestPointerLock();
@@ -760,6 +812,7 @@ class BodycamSimulator {
     });
 
     window.addEventListener('mouseup', (e) => {
+      if (this.inputMode !== 'pc') return;
       if (e.button === 2) {
         this.isAiming = false;
       }
@@ -768,17 +821,228 @@ class BodycamSimulator {
     window.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
+  /**
+   * Прив'язка сенсорних/екранних джойстиків та фізичного геймпада (Xbox / PlayStation)
+   */
+  bindJoystickControls() {
+    const setupStick = (zoneId, knobId, outVec) => {
+      const zone = document.getElementById(zoneId);
+      const knob = document.getElementById(knobId);
+      if (!zone || !knob) return;
+
+      let activePointerId = null;
+      const maxRadius = 46;
+
+      const updateStick = (clientX, clientY) => {
+        const rect = zone.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        let dx = clientX - cx;
+        let dy = clientY - cy;
+        const dist = Math.hypot(dx, dy);
+        if (dist > maxRadius) {
+          dx = (dx / dist) * maxRadius;
+          dy = (dy / dist) * maxRadius;
+        }
+        knob.style.transform = `translate(${dx}px, ${dy}px)`;
+        outVec.set(dx / maxRadius, dy / maxRadius);
+      };
+
+      const resetStick = () => {
+        activePointerId = null;
+        knob.style.transform = 'translate(0px, 0px)';
+        outVec.set(0, 0);
+      };
+
+      zone.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        activePointerId = e.pointerId;
+        zone.setPointerCapture(e.pointerId);
+        updateStick(e.clientX, e.clientY);
+      });
+
+      zone.addEventListener('pointermove', (e) => {
+        if (e.pointerId !== activePointerId) return;
+        e.preventDefault();
+        updateStick(e.clientX, e.clientY);
+      });
+
+      zone.addEventListener('pointerup', (e) => {
+        if (e.pointerId === activePointerId) resetStick();
+      });
+      zone.addEventListener('pointercancel', (e) => {
+        if (e.pointerId === activePointerId) resetStick();
+      });
+    };
+
+    setupStick('joy-left-zone', 'joy-left-knob', this.joyLeftVec);
+    setupStick('joy-right-zone', 'joy-right-knob', this.joyRightVec);
+
+    const bindBtn = (id, onDown, onUp = null) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        onDown(el);
+      });
+      if (onUp) {
+        el.addEventListener('pointerup', (e) => {
+          e.preventDefault();
+          onUp(el);
+        });
+        el.addEventListener('pointerleave', () => onUp(el));
+      }
+    };
+
+    // Вогонь (R2): одноразовий постріл при натисканні + повтор при утриманні
+    bindBtn(
+      'joy-btn-fire',
+      () => {
+        if (!this.isDead) this.fireWeapon();
+        this.joyFiring = true;
+        this.joyFireTimer = 0.16;
+      },
+      () => {
+        this.joyFiring = false;
+      }
+    );
+
+    // Приціл (L2): перемикання прицілювання
+    bindBtn('joy-btn-aim', (el) => {
+      this.isAiming = !this.isAiming;
+      el.classList.toggle('active', this.isAiming);
+      this.audio.playGearRustle(0.2);
+    });
+
+    // Нахили корпусу вліво / вправо (L1 / R1)
+    bindBtn('joy-btn-lean-l', (el) => {
+      this.leanTarget = this.leanTarget === -1 ? 0 : -1;
+      el.classList.toggle('active', this.leanTarget === -1);
+      document.getElementById('joy-btn-lean-r')?.classList.remove('active');
+      this.audio.playGearRustle(0.22);
+    });
+
+    bindBtn('joy-btn-lean-r', (el) => {
+      this.leanTarget = this.leanTarget === 1 ? 0 : 1;
+      el.classList.toggle('active', this.leanTarget === 1);
+      document.getElementById('joy-btn-lean-l')?.classList.remove('active');
+      this.audio.playGearRustle(0.22);
+    });
+
+    bindBtn('joy-btn-reload', () => this.triggerReload());
+    bindBtn('joy-btn-check', () => this.triggerAmmoCheck());
+    bindBtn('joy-btn-grenade', () => this.throwFlashbang());
+    bindBtn('joy-btn-light', () => {
+      this.flashlightOn = !this.flashlightOn;
+      this.flashlight.intensity = this.flashlightOn ? 4.5 : 0.0;
+      this.audio.playWeaponHandling('dry');
+    });
+    bindBtn('joy-btn-nvg', () => this.toggleNightVision());
+    bindBtn('joy-btn-map', () => this.rotateToNextBrightMap(true));
+    bindBtn('joy-btn-mute', () => this.toggleMuteAudio());
+    bindBtn('joy-btn-menu', () => this.toggleOpticsDrawer());
+
+    window.addEventListener('gamepadconnected', (e) => {
+      const pill = document.getElementById('gamepad-status-pill');
+      if (pill) {
+        pill.textContent = `🎮 ГЕЙМПАД ПІДКЛЮЧЕНО: ${e.gamepad.id.slice(0, 24)}`;
+      }
+      this.showDiegeticThought('ФІЗИЧНИЙ ДЖОЙСТИК / ГЕЙМПАД ПІДКЛЮЧЕНО ТА ГОТОВО ДО БОЮ');
+    });
+  }
+
+  /**
+   * Опитування фізичного геймпада (HTML5 Gamepad API) та екранних джойстиків щокадру
+   */
+  pollGamepadAndJoystick(dt) {
+    // 1. Обробка правого екранного джойстика (Free-Aim поворот зброї та корпусу)
+    if (this.inputMode === 'joystick' && this.joyRightVec.lengthSq() > 0.002) {
+      const lookSpeed = (this.isAiming ? 1.55 : 2.55) * dt;
+      this.applyLookDelta(this.joyRightVec.x * lookSpeed, this.joyRightVec.y * lookSpeed);
+    }
+
+    // Автоматична стрільба при утриманні кнопки ВОГОНЬ (R2) на екранному джойстику
+    if (this.joyFiring && !this.isDead) {
+      this.joyFireTimer -= dt;
+      if (this.joyFireTimer <= 0) {
+        this.joyFireTimer = 0.14;
+        this.fireWeapon();
+      }
+    }
+
+    // 2. Опитування фізичного геймпада Xbox / PlayStation (якщо підключений по USB або Bluetooth)
+    if (!navigator.getGamepads) return;
+    const pads = navigator.getGamepads();
+    const gp = pads ? (pads[0] || pads[1] || pads[2] || pads[3]) : null;
+    if (!gp) return;
+
+    this.activeGamepad = gp;
+    const dz = (v) => (Math.abs(v) < 0.14 ? 0 : v);
+
+    // Правий стік фізичного геймпада (axes[2], axes[3])
+    const rx = dz(gp.axes[2] || 0);
+    const ry = dz(gp.axes[3] || 0);
+    if (rx !== 0 || ry !== 0) {
+      const lookSpeed = (this.isAiming ? 1.65 : 2.75) * dt;
+      this.applyLookDelta(rx * lookSpeed, ry * lookSpeed);
+    }
+
+    const isPressed = (idx) => Boolean(gp.buttons[idx] && gp.buttons[idx].pressed);
+    const justPressed = (idx) => isPressed(idx) && !this.prevGamepadButtons[idx];
+
+    // R2 (7) — Вогонь, L2 (6) — Приціл
+    if (justPressed(7)) this.fireWeapon();
+    if (gp.buttons[6]) {
+      this.isAiming = gp.buttons[6].pressed;
+    }
+
+    // L1 (4) / R1 (5) — Нахили корпусу вліво / вправо
+    if (justPressed(4)) {
+      this.leanTarget = this.leanTarget === -1 ? 0 : -1;
+      this.audio.playGearRustle(0.2);
+    }
+    if (justPressed(5)) {
+      this.leanTarget = this.leanTarget === 1 ? 0 : 1;
+      this.audio.playGearRustle(0.2);
+    }
+
+    // X / Square (2) — Перезарядка, Y / Triangle (3) — Огляд магазину, B / Circle (1) — Граната
+    if (justPressed(2)) this.triggerReload();
+    if (justPressed(3)) this.triggerAmmoCheck();
+    if (justPressed(1)) this.throwFlashbang();
+
+    // Хрестовина D-Pad: Up (12) Ліхтар, Down (13) Звук, Left (14) ПНБ, Right (15) Карта, Start (9) Меню
+    if (justPressed(12)) {
+      this.flashlightOn = !this.flashlightOn;
+      this.flashlight.intensity = this.flashlightOn ? 4.5 : 0.0;
+    }
+    if (justPressed(13)) this.toggleMuteAudio();
+    if (justPressed(14)) this.toggleNightVision();
+    if (justPressed(15)) this.rotateToNextBrightMap(true);
+    if (justPressed(9)) this.toggleOpticsDrawer();
+
+    for (let i = 0; i < gp.buttons.length; i++) {
+      this.prevGamepadButtons[i] = Boolean(gp.buttons[i] && gp.buttons[i].pressed);
+    }
+  }
+
   bindUI() {
     const startBtn = document.getElementById('start-operation-btn');
     const retryBtn = document.getElementById('retry-operation-btn');
     const backBriefingBtn = document.getElementById('back-to-briefing-btn');
+    const inputPcBtn = document.getElementById('input-pc-btn');
+    const inputJoyBtn = document.getElementById('input-joystick-btn');
     const modeTdmBtn = document.getElementById('mode-tdm-btn');
     const modeDmBtn = document.getElementById('mode-dm-btn');
     const closeOpticsBtn = document.getElementById('close-optics-btn');
+    const drawerToggleInputBtn = document.getElementById('drawer-toggle-input-btn');
     const drawerToggleModeBtn = document.getElementById('drawer-toggle-mode-btn');
     const drawerNextMapBtn = document.getElementById('drawer-next-map-btn');
     const drawerToggleNvgBtn = document.getElementById('drawer-toggle-nvg-btn');
     const spawnWaveBtn = document.getElementById('spawn-wave-btn');
+
+    if (inputPcBtn) inputPcBtn.addEventListener('click', () => this.setInputMode('pc'));
+    if (inputJoyBtn) inputJoyBtn.addEventListener('click', () => this.setInputMode('joystick'));
 
     modeTdmBtn.addEventListener('click', () => this.setGameMode('tdm'));
     modeDmBtn.addEventListener('click', () => this.setGameMode('dm'));
@@ -802,12 +1066,25 @@ class BodycamSimulator {
     backBriefingBtn.addEventListener('click', () => {
       document.getElementById('endgame-modal').classList.add('hidden');
       document.getElementById('briefing-modal').classList.remove('hidden');
+      document.getElementById('joystick-hud')?.classList.add('hidden');
       this.resetOperation();
     });
 
     closeOpticsBtn.addEventListener('click', () => {
       this.toggleOpticsDrawer(false);
     });
+
+    if (drawerToggleInputBtn) {
+      drawerToggleInputBtn.addEventListener('click', () => {
+        const nextInput = this.inputMode === 'pc' ? 'joystick' : 'pc';
+        this.setInputMode(nextInput);
+        this.showDiegeticThought(
+          nextInput === 'joystick'
+            ? 'УВІМКНЕНО РЕЖИМ ДЖОЙСТИКА (ЕКРАННІ СТІКИ ТА ГЕЙМПАД XBOX/PS)'
+            : "УВІМКНЕНО РЕЖИМ КОМП'ЮТЕРА (КЛАВІАТУРА WASD ТА МИША)"
+        );
+      });
+    }
 
     drawerToggleModeBtn.addEventListener('click', () => {
       const nextMode = this.gameMode === 'tdm' ? 'dm' : 'tdm';
@@ -865,14 +1142,20 @@ class BodycamSimulator {
 
   toggleOpticsDrawer(forceState) {
     const drawer = document.getElementById('optics-drawer');
+    const joyHud = document.getElementById('joystick-hud');
     this.opticsMenuOpen = typeof forceState === 'boolean' ? forceState : drawer.classList.contains('hidden');
     if (this.opticsMenuOpen) {
       drawer.classList.remove('hidden');
+      if (joyHud) joyHud.classList.add('hidden');
       if (document.pointerLockElement) document.exitPointerLock();
     } else {
       drawer.classList.add('hidden');
       if (this.isRunning && !this.isDead) {
-        this.canvas.requestPointerLock();
+        if (this.inputMode === 'joystick') {
+          if (joyHud) joyHud.classList.remove('hidden');
+        } else {
+          this.canvas.requestPointerLock();
+        }
       }
     }
   }
@@ -882,7 +1165,18 @@ class BodycamSimulator {
     document.getElementById('briefing-modal').classList.add('hidden');
     document.getElementById('endgame-modal').classList.add('hidden');
     this.isRunning = true;
-    this.canvas.requestPointerLock();
+
+    const joyHud = document.getElementById('joystick-hud');
+    const whisper = document.getElementById('controls-whisper');
+    if (this.inputMode === 'joystick') {
+      if (joyHud) joyHud.classList.remove('hidden');
+      if (whisper) whisper.classList.add('hidden');
+      if (document.pointerLockElement) document.exitPointerLock();
+    } else {
+      if (joyHud) joyHud.classList.add('hidden');
+      if (whisper) whisper.classList.remove('hidden');
+      this.canvas.requestPointerLock();
+    }
   }
 
   resetOperation() {
@@ -1248,8 +1542,35 @@ class BodycamSimulator {
     if (this.keys['KeyD']) moveInput.add(right);
     if (this.keys['KeyA']) moveInput.sub(right);
 
+    // Рух від лівого екранного джойстика (якщо обрано режим ДЖОЙСТИК)
+    let joystickSprint = false;
+    if (this.inputMode === 'joystick' && this.joyLeftVec.lengthSq() > 0.01) {
+      moveInput.addScaledVector(right, this.joyLeftVec.x);
+      moveInput.addScaledVector(forward, -this.joyLeftVec.y);
+      if (this.joyLeftVec.length() > 0.82) {
+        joystickSprint = true;
+      }
+    }
+
+    // Рух від лівого стіка фізичного геймпада Xbox / PlayStation
+    if (this.activeGamepad && this.activeGamepad.axes) {
+      const gx = Math.abs(this.activeGamepad.axes[0] || 0) > 0.14 ? this.activeGamepad.axes[0] : 0;
+      const gy = Math.abs(this.activeGamepad.axes[1] || 0) > 0.14 ? this.activeGamepad.axes[1] : 0;
+      if (gx !== 0 || gy !== 0) {
+        moveInput.addScaledVector(right, gx);
+        moveInput.addScaledVector(forward, -gy);
+        if (Math.hypot(gx, gy) > 0.85 || (this.activeGamepad.buttons[10] && this.activeGamepad.buttons[10].pressed)) {
+          joystickSprint = true;
+        }
+      }
+    }
+
     const isMoving = moveInput.lengthSq() > 0.001;
-    const isSprinting = isMoving && (this.keys['ShiftLeft'] || this.keys['ShiftRight']) && !this.isAiming && this.leanTarget === 0;
+    const isSprinting =
+      isMoving &&
+      (this.keys['ShiftLeft'] || this.keys['ShiftRight'] || joystickSprint) &&
+      !this.isAiming &&
+      this.leanTarget === 0;
     const moveSpeed = isSprinting ? 4.55 : (this.isAiming ? 2.2 : 3.25);
 
     if (isMoving) {
@@ -1540,6 +1861,7 @@ class BodycamSimulator {
     this.updateAxonTimestamp();
 
     if (this.isRunning && !this.opticsMenuOpen) {
+      this.pollGamepadAndJoystick(dt);
       this.updateMapRotationTimer(dt);
       this.updatePlayerMovement(dt);
       this.updateAIAndGrenades(dt, elapsed);

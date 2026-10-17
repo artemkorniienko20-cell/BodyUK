@@ -45,7 +45,7 @@
     <!-- Повідомлення про зміну карти або командну подію (вшите у відеопотік) -->
     <div id="diegetic-thought" class="diegetic-thought hidden"></div>
 
-    <!-- Мінімальна підказка клавіш у нижньому лівому куті -->
+      <!-- Мінімальна підказка клавіш у нижньому лівому куті -->
     <div id="controls-whisper" class="controls-whisper">
       <span><b>WASD</b> Рух</span>
       <span><b>Q / E</b> Нахил за ріг</span>
@@ -58,6 +58,50 @@
       <span><b>F</b> Ліхтарик / ІЧ-лазер</span>
       <span><b>G</b> Граната</span>
       <span><b>TAB</b> Меню / Режими</span>
+    </div>
+  </div>
+
+  <!-- Інтерактивний інтерфейс керування ДЖОЙСТИКОМ (Віртуальні стіки + Підтримка геймпада Xbox/PS) -->
+  <div id="joystick-hud" class="joystick-hud hidden">
+    <!-- Верхній ряд швидких тактичних кнопок для режиму Джойстика -->
+    <div class="joy-top-bar">
+      <button id="joy-btn-menu" class="joy-top-btn">⚙️ МЕНЮ</button>
+      <button id="joy-btn-nvg" class="joy-top-btn">🟢 ПНБ [N]</button>
+      <button id="joy-btn-map" class="joy-top-btn">🗺️ КАРТА [M]</button>
+      <button id="joy-btn-light" class="joy-top-btn">🔦 ЛІХТАР</button>
+      <button id="joy-btn-mute" class="joy-top-btn">🔊 ЗВУК</button>
+      <span id="gamepad-status-pill" class="gamepad-pill">🎮 СТІКИ АКТИВНІ (ПІДТРИМКА XBOX / PS GAMEPAD)</span>
+    </div>
+
+    <!-- Лівий аналоговий джойстик: РУХ ТА СПРИНТ -->
+    <div class="joy-left-Side">
+      <div class="joy-lean-row">
+        <button id="joy-btn-lean-l" class="joy-action-btn small">↖ НАХИЛ L (L1)</button>
+        <button id="joy-btn-lean-r" class="joy-action-btn small">НАХИЛ R (R1) ↗</button>
+      </div>
+      <div id="joy-left-zone" class="joy-stick-zone">
+        <div class="joy-stick-ring"></div>
+        <div id="joy-left-knob" class="joy-stick-knob">РУХ</div>
+      </div>
+      <div class="joy-stick-caption">ЛІВИЙ ДЖОЙСТИК: РУХ / СПРИНТ</div>
+    </div>
+
+    <!-- Правий аналоговий джойстик: ПРИЦІЛЮВАННЯ FREE-AIM ТА БОЙОВІ ДІЇ -->
+    <div class="joy-right-side">
+      <div class="joy-combat-cluster">
+        <button id="joy-btn-fire" class="joy-action-btn fire-btn">🔥 ВОГОНЬ (R2)</button>
+        <button id="joy-btn-aim" class="joy-action-btn aim-btn">🎯 ПРИЦІЛ (L2)</button>
+      </div>
+      <div class="joy-utility-row">
+        <button id="joy-btn-reload" class="joy-action-btn small">🔄 ПЕРЕЗАРЯД (X)</button>
+        <button id="joy-btn-check" class="joy-action-btn small">🔍 МАГАЗИН (Y)</button>
+        <button id="joy-btn-grenade" class="joy-action-btn small">💥 ГРАНАТА (B)</button>
+      </div>
+      <div id="joy-right-zone" class="joy-stick-zone">
+        <div class="joy-stick-ring"></div>
+        <div id="joy-right-knob" class="joy-stick-knob">ПРИЦІЛ</div>
+      </div>
+      <div class="joy-stick-caption">ПРАВИЙ ДЖОЙСТИК: ВІЛЬНИЙ ПРИЦІЛ</div>
     </div>
   </div>
 
@@ -93,7 +137,8 @@
         <input type="range" id="opt-micclip" min="0.1" max="1.0" step="0.05" value="0.85" />
       </label>
       <div class="optic-actions">
-        <button id="drawer-toggle-mode-btn" class="tactical-btn">ПЕРЕellКНУТИ РЕЖИМ: КОМАНДНИЙ БІЙ / DEATHMATCH</button>
+        <button id="drawer-toggle-input-btn" class="tactical-btn">КЕРУВАННЯ: КОМП'ЮТЕР (КЛАВІАТУРА+МИША)</button>
+        <button id="drawer-toggle-mode-btn" class="tactical-btn">ПЕРЕМКНУТИ РЕЖИМ: КОМАНДНИЙ БІЙ / DEATHMATCH</button>
         <button id="drawer-next-map-btn" class="tactical-btn">НАСТУПНА СВІТЛА КАРТА [M]</button>
         <button id="drawer-toggle-nvg-btn" class="tactical-btn">УВІМК/ВИМК ОКУЛЯРИ НІЧНОГО БАЧЕННЯ [N]</button>
         <button id="spawn-wave-btn" class="tactical-btn">ПЕРЕЗАПУСТИТИ РАУНД</button>
@@ -112,8 +157,21 @@
       <h1>BODYCAM <span class="sub-h1">TEAM FIGHT & DEATHMATCH EDITION</span></h1>
       <p class="lead-desc">
         Ультрареалістичний шутер з камерою на рівні грудей бійця, оптикою «риб'яче око», перевантаженим мікрофоном,
-        <b>окулярами нічного бачення [N]</b> та <b>4 світлими денними картами</b>, які в режимі Deathmatch автоматично змінюються щохвилини!
+        <b>окулярами нічного бачення [N]</b> та <b>5 тактичними картами</b> (Денний і Нічний ліс, Склад, Геліпад, Пустеля)!
       </p>
+
+      <!-- Вибір типу керування: Комп'ютер або Джойстик -->
+      <div class="selector-section">
+        <div class="selector-label">ОБЕРІТЬ ТИП КЕРУВАННЯ (ПРИСТРІЙ):</div>
+        <div class="mode-selector">
+          <button id="input-pc-btn" class="preset-btn active" data-input="pc">
+            💻 ГРАТИ НА КОМП'ЮТЕРІ (Клавіатура WASD + Миша)
+          </button>
+          <button id="input-joystick-btn" class="preset-btn" data-input="joystick">
+            🎮 ГРАТИ НА ДЖОЙСТИКУ (Екранні джойстики + Геймпад Xbox / PlayStation)
+          </button>
+        </div>
+      </div>
 
       <!-- Вибір ігрового режиму -->
       <div class="selector-section">
@@ -144,19 +202,19 @@
         <div class="feature-box">
           <h3>НОВІ МОЖЛИВОСТІ ОПЕРАЦІЇ</h3>
           <ul>
-            <li><b>Командний бій (5v5):</b> бійці вашого підрозділу SWAT (у синіх шоломах із жовтими маркерами) штурмують локацію разом із вами та прикривають вогнем.</li>
-            <li><b>Deathmatch із ротацією 60 с:</b> кожну хвилину відбувається автоматичний перехід на нову світлу карту з повним оновленням позицій.</li>
-            <li><b>Окуляри нічного бачення [N]:</b> двотрубний зелений/білий фосфор `AN/PVS-31` із характерним писком запуску та зеленим ІЧ-лазером `PEQ-15` на цівці!</li>
+            <li><b>Вибір керування (ПК або Джойстик):</b> класичне керування клавіатурою й мишею або режим джойстика з двома аналоговими стіками на екрані та повною підтримкою фізичних геймпадів Xbox / PlayStation.</li>
+            <li><b>Командний бій (5v5) та Deathmatch (60 с):</b> штурмуйте локацію разом із союзниками SWAT або змагайтесь у режимі кожен сам за себе зі зміною карти щохвилини.</li>
+            <li><b>Окуляри нічного бачення [N]:</b> двотрубний зелений фосфор `AN/PVS-31` із ІЧ-лазером `PEQ-15` для бою в Нічному лісі!</li>
           </ul>
         </div>
 
         <div class="feature-box">
-          <h3>КЛЮЧОВІ КЛАВІШІ ОПЕРАТОРА</h3>
-          <ul>
-            <li><b>[N]</b> — Опустити / підняти окуляри нічного бачення (ПНБ).</li>
-            <li><b>[M]</b> — Примусово перемкнути на наступну світлу карту.</li>
-            <li><b>[Q / E]</b> — Тактичні нахили корпусу та камери за роги.</li>
-            <li><b>[T] / [R]</b> — Фізично заглянути в прозорий магазин / Перезарядити.</li>
+          <h3>КЕРУВАННЯ ОПЕРАТОРОМ</h3>
+          <ul id="briefing-controls-list">
+            <li><b>[ПК]:</b> <b>WASD</b> — рух, <b>Миша + ЛКМ/ПКМ</b> — Free-Aim вогонь/приціл, <b>Q/E</b> — нахил за ріг.</li>
+            <li><b>[ДЖОЙСТИК]:</b> <b>Лівий стік</b> — рух/спринт, <b>Правий стік</b> — Free-Aim приціл, <b>R2/L2</b> — вогонь/приціл, <b>L1/R1</b> — нахили.</li>
+            <li><b>[N] / [M] / [Z]:</b> ПНБ нічного бачення / Зміна карти / Вимкнення звуку.</li>
+            <li><b>[T] / [R]:</b> Перевірити прозорий магазин PMAG / Перезарядити зброю.</li>
           </ul>
         </div>
       </div>

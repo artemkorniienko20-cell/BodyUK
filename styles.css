@@ -663,3 +663,133 @@ h1 {
   transform: scale(0.94);
 }
 
+.device-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 720px) {
+  .device-selector-grid,
+  .mode-selector,
+  .map-selector-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================================================
+   ІНТЕРФЕЙС КНОПКОВОГО КЕРУВАННЯ НА ТЕЛЕФОНІ (#phone-hud)
+   ========================================================================= */
+.phone-hud {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.phone-left-pad {
+  position: absolute;
+  left: 20px;
+  bottom: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.phone-right-pad {
+  position: absolute;
+  right: 20px;
+  bottom: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.phone-dpad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 62px);
+  grid-template-rows: repeat(2, 58px);
+  gap: 6px;
+}
+
+.phone-aim-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 62px);
+  grid-template-rows: repeat(3, 54px);
+  gap: 6px;
+}
+
+.phone-dpad-btn {
+  background: rgba(12, 17, 25, 0.84);
+  color: #f8fafc;
+  border: 1.5px solid rgba(255, 212, 59, 0.55);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: none;
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.65);
+  transition: transform 0.08s ease, background 0.12s ease;
+}
+
+.phone-dpad-btn span {
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  color: #ffd43b;
+}
+
+.phone-dpad-btn.aim-dir {
+  border-color: rgba(56, 189, 248, 0.55);
+}
+
+.phone-dpad-btn.aim-dir span {
+  color: #7dd3fc;
+}
+
+.phone-dpad-btn.pressed,
+.phone-dpad-btn:active {
+  background: rgba(255, 212, 59, 0.34);
+  border-color: #ffd43b;
+  transform: scale(0.93);
+}
+
+.phone-fire-center-btn {
+  background: radial-gradient(circle, #ef4444 0%, #b91c1c 80%, #7f1d1d 100%);
+  color: #ffffff;
+  border: 2px solid #fca5a5;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: none;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+}
+
+.phone-fire-center-btn span {
+  font-size: 9.5px;
+  letter-spacing: 0.6px;
+}
+
+.phone-fire-center-btn:active {
+  transform: scale(0.92);
+  background: #dc2626;
+}
+
+

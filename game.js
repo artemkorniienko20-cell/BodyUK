@@ -97,10 +97,12 @@ class BodycamSimulator {
     this.walkCycle = 0;
     this.stepAccum = 0;
 
-    // Режим керування: 'pc' (Клавіатура WASD + Миша) або 'joystick' (Екранні джойстики + Фізичний геймпад Xbox/PS)
+    // Режим керування: 'pc' (Клавіатура WASD + Миша), 'joystick' (Стіки + Геймпад) або 'phone' (Кнопки для телефона)
     this.inputMode = 'pc';
     this.joyLeftVec = new THREE.Vector2(0, 0);
     this.joyRightVec = new THREE.Vector2(0, 0);
+    this.phoneLookVec = new THREE.Vector2(0, 0);
+    this.phoneSprintActive = false;
     this.joyFiring = false;
     this.joyFireTimer = 0;
     this.prevGamepadButtons = {};
@@ -116,6 +118,7 @@ class BodycamSimulator {
     this.bindEvents();
     this.bindUI();
     this.bindJoystickControls();
+    this.bindPhoneControls();
 
     this.clock = new THREE.Clock();
     this.animate = this.animate.bind(this);
@@ -612,38 +615,59 @@ class BodycamSimulator {
   }
 
   /**
-   * Перемикання типу керування: 'pc' (Клавіатура WASD + Миша) або 'joystick' (Екранні стіки + Геймпад)
+   * Перемикання типу керування: 'pc' (Клавіатура WASD + Миша), 'joystick' (Стіки + Геймпад) або 'phone' (Кнопки для телефона)
    */
   setInputMode(mode) {
-    this.inputMode = mode === 'joystick' ? 'joystick' : 'pc';
+    this.inputMode = (mode === 'joystick' || mode === 'phone') ? mode : 'pc';
 
     const pcBtn = document.getElementById('input-pc-btn');
     const joyBtn = document.getElementById('input-joystick-btn');
+    const phoneBtn = document.getElementById('input-phone-btn');
     const drawerInputBtn = document.getElementById('drawer-toggle-input-btn');
     const joyHud = document.getElementById('joystick-hud');
+    const phoneHud = document.getElementById('phone-hud');
     const whisper = document.getElementById('controls-whisper');
 
     if (pcBtn) pcBtn.classList.toggle('active', this.inputMode === 'pc');
     if (joyBtn) joyBtn.classList.toggle('active', this.inputMode === 'joystick');
+    if (phoneBtn) phoneBtn.classList.toggle('active', this.inputMode === 'phone');
     if (drawerInputBtn) {
-      drawerInputBtn.textContent = this.inputMode === 'joystick'
-        ? 'КЕРУВАННЯ: 🎮 ДЖОЙСТИК (СТІКИ / ГЕЙМПАД)'
-        : "КЕРУВАННЯ: 💻 КОМП'ЮТЕР (КЛАВІАТУРА+МИША)";
+      if (this.inputMode === 'joystick') {
+        drawerInputBtn.textContent = 'КЕРУВАННЯ: 🎮 ДЖОЙСТИК (СТІКИ / ГЕЙМПАД)';
+      } else if (this.inputMode === 'phone') {
+        drawerInputBtn.textContent = 'КЕРУВАННЯ: 📱 ТЕЛЕФОН (КНОПКИ НА ЕКРАНІ)';
+      } else {
+        drawerInputBtn.textContent = "КЕРУВАННЯ: 💻 КОМП'ЮТЕР (КЛАВІАТУРА+МИША)";
+      }
     }
 
     if (this.inputMode === 'joystick') {
       if (document.pointerLockElement) document.exitPointerLock();
       this.canvas.style.cursor = 'default';
+      if (phoneHud) phoneHud.classList.add('hidden');
       if (this.isRunning && !this.opticsMenuOpen && joyHud) {
         joyHud.classList.remove('hidden');
       }
       if (whisper) whisper.classList.add('hidden');
+      this.phoneLookVec.set(0, 0);
+    } else if (this.inputMode === 'phone') {
+      if (document.pointerLockElement) document.exitPointerLock();
+      this.canvas.style.cursor = 'default';
+      if (joyHud) joyHud.classList.add('hidden');
+      if (this.isRunning && !this.opticsMenuOpen && phoneHud) {
+        phoneHud.classList.remove('hidden');
+      }
+      if (whisper) whisper.classList.add('hidden');
+      this.joyLeftVec.set(0, 0);
+      this.joyRightVec.set(0, 0);
     } else {
       this.canvas.style.cursor = 'crosshair';
       if (joyHud) joyHud.classList.add('hidden');
+      if (phoneHud) phoneHud.classList.add('hidden');
       if (whisper) whisper.classList.remove('hidden');
       this.joyLeftVec.set(0, 0);
       this.joyRightVec.set(0, 0);
+      this.phoneLookVec.set(0, 0);
       this.joyFiring = false;
     }
   }
@@ -952,7 +976,180 @@ class BodycamSimulator {
   }
 
   /**
-   * Опитування фізичного геймпада (HTML5 Gamepad API) та екранних джойстиків щокадру
+   * Прив'язка кнопок для режиму «На телефоні» (#phone-hud):
+   * кнопкова хрестовина руху, кнопки повороту прицілу, кнопка ВОГОНЬ, свайп-прицілювання по екрану та верхня панель
+   */
+  bindPhoneControls() {
+    const bindHoldBtn = (id, onDown, onUp) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const release = () => {
+        el.classList.remove('active');
+        onUp(el);
+      };
+      el.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        el.setPointerCapture(e.pointerId);
+        el.classList.add('active');
+        onDown(el);
+      });
+      el.addEventListener('pointerup', (e) => {
+        e.preventDefault();
+        release();
+      });
+      el.addEventListener('pointercancel', release);
+      el.addEventListener('lostpointercapture', release);
+    };
+
+    const bindTapBtn = (id, onTap) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        onTap(el);
+      });
+    };
+
+    // Кнопки руху (D-Pad): ВПЕРЕД, НАЗАД, ВЛІВО, ВПРАВО
+    bindHoldBtn(
+      'phone-move-up',
+      () => { this.keys['KeyW'] = true; },
+      () => { this.keys['KeyW'] = false; }
+    );
+    bindHoldBtn(
+      'phone-move-down',
+      () => { this.keys['KeyS'] = true; },
+      () => { this.keys['KeyS'] = false; }
+    );
+    bindHoldBtn(
+      'phone-move-left',
+      () => { this.keys['KeyA'] = true; },
+      () => { this.keys['KeyA'] = false; }
+    );
+    bindHoldBtn(
+      'phone-move-right',
+      () => { this.keys['KeyD'] = true; },
+      () => { this.keys['KeyD'] = false; }
+    );
+
+    // Перемикач БІГ (Спринт) на телефоні
+    bindTapBtn('phone-btn-sprint', (el) => {
+      this.phoneSprintActive = !this.phoneSprintActive;
+      el.classList.toggle('active', this.phoneSprintActive);
+    });
+
+    // Нахили корпусу ВЛІВО / ВПРАВО
+    bindTapBtn('phone-btn-lean-l', (el) => {
+      this.leanTarget = this.leanTarget === -1 ? 0 : -1;
+      el.classList.toggle('active', this.leanTarget === -1);
+      document.getElementById('phone-btn-lean-r')?.classList.remove('active');
+      this.audio.playGearRustle(0.22);
+    });
+    bindTapBtn('phone-btn-lean-r', (el) => {
+      this.leanTarget = this.leanTarget === 1 ? 0 : 1;
+      el.classList.toggle('active', this.leanTarget === 1);
+      document.getElementById('phone-btn-lean-l')?.classList.remove('active');
+      this.audio.playGearRustle(0.22);
+    });
+
+    // Кнопки повороту камери та прицілу (ВГОРУ / ВНИЗ / ВЛІВО / ВПРАВО)
+    bindHoldBtn(
+      'phone-look-up',
+      () => { this.phoneLookVec.y = -1; },
+      () => { if (this.phoneLookVec.y < 0) this.phoneLookVec.y = 0; }
+    );
+    bindHoldBtn(
+      'phone-look-down',
+      () => { this.phoneLookVec.y = 1; },
+      () => { if (this.phoneLookVec.y > 0) this.phoneLookVec.y = 0; }
+    );
+    bindHoldBtn(
+      'phone-look-left',
+      () => { this.phoneLookVec.x = -1; },
+      () => { if (this.phoneLookVec.x < 0) this.phoneLookVec.x = 0; }
+    );
+    bindHoldBtn(
+      'phone-look-right',
+      () => { this.phoneLookVec.x = 1; },
+      () => { if (this.phoneLookVec.x > 0) this.phoneLookVec.x = 0; }
+    );
+
+    // Центральна кнопка ВОГОНЬ (стрільба одиночними або чергою при утриманні)
+    bindHoldBtn(
+      'phone-btn-fire',
+      () => {
+        if (!this.isDead) this.fireWeapon();
+        this.joyFiring = true;
+        this.joyFireTimer = 0.16;
+      },
+      () => {
+        this.joyFiring = false;
+      }
+    );
+
+    // Тактичні кнопки справа: Приціл, Перезарядка, Магазин, Граната
+    bindTapBtn('phone-btn-aim', (el) => {
+      this.isAiming = !this.isAiming;
+      el.classList.toggle('active', this.isAiming);
+      this.audio.playGearRustle(0.2);
+    });
+    bindTapBtn('phone-btn-reload', () => this.triggerReload());
+    bindTapBtn('phone-btn-check', () => this.triggerAmmoCheck());
+    bindTapBtn('phone-btn-grenade', () => this.throwFlashbang());
+
+    // Верхня панель швидких дій на телефоні
+    bindTapBtn('phone-btn-menu', () => this.toggleOpticsDrawer());
+    bindTapBtn('phone-btn-nvg', () => this.toggleNightVision());
+    bindTapBtn('phone-btn-map', () => this.rotateToNextBrightMap(true));
+    bindTapBtn('phone-btn-light', () => {
+      this.flashlightOn = !this.flashlightOn;
+      this.flashlight.intensity = this.flashlightOn ? 4.5 : 0.0;
+      this.audio.playWeaponHandling('dry');
+    });
+    bindTapBtn('phone-btn-mute', () => this.toggleMuteAudio());
+    bindTapBtn('phone-btn-fullscreen', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen?.().catch(() => {});
+      } else {
+        document.exitFullscreen?.().catch(() => {});
+      }
+    });
+
+    // Додатково: свайп пальцем безпосередньо по 3D-екрану в режимі телефона або джойстика для швидкого огляду
+    let touchLookPointerId = null;
+    let lastTouchX = 0;
+    let lastTouchY = 0;
+
+    this.canvas.addEventListener('pointerdown', (e) => {
+      if (this.inputMode === 'pc') return;
+      if (!this.isRunning || this.isDead || this.opticsMenuOpen) return;
+      touchLookPointerId = e.pointerId;
+      lastTouchX = e.clientX;
+      lastTouchY = e.clientY;
+    });
+
+    this.canvas.addEventListener('pointermove', (e) => {
+      if (this.inputMode === 'pc' || e.pointerId !== touchLookPointerId) return;
+      if (!this.isRunning || this.isDead || this.opticsMenuOpen) return;
+      const dx = e.clientX - lastTouchX;
+      const dy = e.clientY - lastTouchY;
+      lastTouchX = e.clientX;
+      lastTouchY = e.clientY;
+      const sens = this.isAiming ? 0.0024 : 0.0038;
+      this.applyLookDelta(dx * sens, dy * sens);
+    });
+
+    const endTouchLook = (e) => {
+      if (e.pointerId === touchLookPointerId) {
+        touchLookPointerId = null;
+      }
+    };
+    this.canvas.addEventListener('pointerup', endTouchLook);
+    this.canvas.addEventListener('pointercancel', endTouchLook);
+  }
+
+  /**
+   * Опитування фізичного геймпада (HTML5 Gamepad API), екранних джойстиків та кнопок телефона щокадру
    */
   pollGamepadAndJoystick(dt) {
     // 1. Обробка правого екранного джойстика (Free-Aim поворот зброї та корпусу)
@@ -961,7 +1158,13 @@ class BodycamSimulator {
       this.applyLookDelta(this.joyRightVec.x * lookSpeed, this.joyRightVec.y * lookSpeed);
     }
 
-    // Автоматична стрільба при утриманні кнопки ВОГОНЬ (R2) на екранному джойстику
+    // 1b. Обробка кнопок повороту прицілу в режимі «На телефоні»
+    if (this.inputMode === 'phone' && this.phoneLookVec.lengthSq() > 0.001) {
+      const lookSpeed = (this.isAiming ? 1.35 : 2.25) * dt;
+      this.applyLookDelta(this.phoneLookVec.x * lookSpeed, this.phoneLookVec.y * lookSpeed);
+    }
+
+    // Автоматична стрільба при утриманні кнопки ВОГОНЬ на джойстику або телефоні
     if (this.joyFiring && !this.isDead) {
       this.joyFireTimer -= dt;
       if (this.joyFireTimer <= 0) {
@@ -1032,6 +1235,7 @@ class BodycamSimulator {
     const backBriefingBtn = document.getElementById('back-to-briefing-btn');
     const inputPcBtn = document.getElementById('input-pc-btn');
     const inputJoyBtn = document.getElementById('input-joystick-btn');
+    const inputPhoneBtn = document.getElementById('input-phone-btn');
     const modeTdmBtn = document.getElementById('mode-tdm-btn');
     const modeDmBtn = document.getElementById('mode-dm-btn');
     const closeOpticsBtn = document.getElementById('close-optics-btn');
@@ -1043,6 +1247,7 @@ class BodycamSimulator {
 
     if (inputPcBtn) inputPcBtn.addEventListener('click', () => this.setInputMode('pc'));
     if (inputJoyBtn) inputJoyBtn.addEventListener('click', () => this.setInputMode('joystick'));
+    if (inputPhoneBtn) inputPhoneBtn.addEventListener('click', () => this.setInputMode('phone'));
 
     modeTdmBtn.addEventListener('click', () => this.setGameMode('tdm'));
     modeDmBtn.addEventListener('click', () => this.setGameMode('dm'));
@@ -1067,6 +1272,7 @@ class BodycamSimulator {
       document.getElementById('endgame-modal').classList.add('hidden');
       document.getElementById('briefing-modal').classList.remove('hidden');
       document.getElementById('joystick-hud')?.classList.add('hidden');
+      document.getElementById('phone-hud')?.classList.add('hidden');
       this.resetOperation();
     });
 
@@ -1076,13 +1282,17 @@ class BodycamSimulator {
 
     if (drawerToggleInputBtn) {
       drawerToggleInputBtn.addEventListener('click', () => {
-        const nextInput = this.inputMode === 'pc' ? 'joystick' : 'pc';
+        const nextInput = this.inputMode === 'pc'
+          ? 'joystick'
+          : (this.inputMode === 'joystick' ? 'phone' : 'pc');
         this.setInputMode(nextInput);
-        this.showDiegeticThought(
-          nextInput === 'joystick'
-            ? 'УВІМКНЕНО РЕЖИМ ДЖОЙСТИКА (ЕКРАННІ СТІКИ ТА ГЕЙМПАД XBOX/PS)'
-            : "УВІМКНЕНО РЕЖИМ КОМП'ЮТЕРА (КЛАВІАТУРА WASD ТА МИША)"
-        );
+        if (nextInput === 'joystick') {
+          this.showDiegeticThought('УВІМКНЕНО РЕЖИМ ДЖОЙСТИКА (ЕКРАННІ СТІКИ ТА ГЕЙМПАД XBOX/PS)');
+        } else if (nextInput === 'phone') {
+          this.showDiegeticThought('УВІМКНЕНО РЕЖИМ НА ТЕЛЕФОНІ (КНОПКОВЕ КЕРУВАННЯ ТА СЕНСОРНИЙ ОГЛЯД)');
+        } else {
+          this.showDiegeticThought("УВІМКНЕНО РЕЖИМ КОМП'ЮТЕРА (КЛАВІАТУРА WASD ТА МИША)");
+        }
       });
     }
 
@@ -1143,16 +1353,20 @@ class BodycamSimulator {
   toggleOpticsDrawer(forceState) {
     const drawer = document.getElementById('optics-drawer');
     const joyHud = document.getElementById('joystick-hud');
+    const phoneHud = document.getElementById('phone-hud');
     this.opticsMenuOpen = typeof forceState === 'boolean' ? forceState : drawer.classList.contains('hidden');
     if (this.opticsMenuOpen) {
       drawer.classList.remove('hidden');
       if (joyHud) joyHud.classList.add('hidden');
+      if (phoneHud) phoneHud.classList.add('hidden');
       if (document.pointerLockElement) document.exitPointerLock();
     } else {
       drawer.classList.add('hidden');
       if (this.isRunning && !this.isDead) {
         if (this.inputMode === 'joystick') {
           if (joyHud) joyHud.classList.remove('hidden');
+        } else if (this.inputMode === 'phone') {
+          if (phoneHud) phoneHud.classList.remove('hidden');
         } else {
           this.canvas.requestPointerLock();
         }
@@ -1167,13 +1381,21 @@ class BodycamSimulator {
     this.isRunning = true;
 
     const joyHud = document.getElementById('joystick-hud');
+    const phoneHud = document.getElementById('phone-hud');
     const whisper = document.getElementById('controls-whisper');
     if (this.inputMode === 'joystick') {
       if (joyHud) joyHud.classList.remove('hidden');
+      if (phoneHud) phoneHud.classList.add('hidden');
+      if (whisper) whisper.classList.add('hidden');
+      if (document.pointerLockElement) document.exitPointerLock();
+    } else if (this.inputMode === 'phone') {
+      if (phoneHud) phoneHud.classList.remove('hidden');
+      if (joyHud) joyHud.classList.add('hidden');
       if (whisper) whisper.classList.add('hidden');
       if (document.pointerLockElement) document.exitPointerLock();
     } else {
       if (joyHud) joyHud.classList.add('hidden');
+      if (phoneHud) phoneHud.classList.add('hidden');
       if (whisper) whisper.classList.remove('hidden');
       this.canvas.requestPointerLock();
     }
@@ -1568,7 +1790,10 @@ class BodycamSimulator {
     const isMoving = moveInput.lengthSq() > 0.001;
     const isSprinting =
       isMoving &&
-      (this.keys['ShiftLeft'] || this.keys['ShiftRight'] || joystickSprint) &&
+      (this.keys['ShiftLeft'] ||
+        this.keys['ShiftRight'] ||
+        joystickSprint ||
+        (this.inputMode === 'phone' && this.phoneSprintActive)) &&
       !this.isAiming &&
       this.leanTarget === 0;
     const moveSpeed = isSprinting ? 4.55 : (this.isAiming ? 2.2 : 3.25);

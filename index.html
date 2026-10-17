@@ -105,6 +105,61 @@
     </div>
   </div>
 
+  <!-- Інтерактивний інтерфейс керування НА ТЕЛЕФОНІ (Зручні кнопки руху, повороту прицілу та стрільби) -->
+  <div id="phone-hud" class="phone-hud hidden">
+    <!-- Верхній мобільний ряд швидких кнопок -->
+    <div class="joy-top-bar">
+      <button id="phone-btn-menu" class="joy-top-btn">⚙️ МЕНЮ</button>
+      <button id="phone-btn-nvg" class="joy-top-btn">🟢 ПНБ</button>
+      <button id="phone-btn-map" class="joy-top-btn">🗺️ КАРТА</button>
+      <button id="phone-btn-light" class="joy-top-btn">🔦 ЛІХТАР</button>
+      <button id="phone-btn-mute" class="joy-top-btn">🔊 ЗВУК</button>
+      <button id="phone-btn-fullscreen" class="joy-top-btn">⛶ ЕКРАН</button>
+    </div>
+
+    <!-- Лівий блок кнопок для телефону: КНОПКИ РУХУ + БІГ + НАХИЛИ -->
+    <div class="phone-left-pad">
+      <div class="joy-lean-row">
+        <button id="phone-btn-lean-l" class="joy-action-btn small">↖ НАХИЛ L</button>
+        <button id="phone-btn-sprint" class="joy-action-btn small sprint-toggle-btn">🏃 БІГ: ВИМК</button>
+        <button id="phone-btn-lean-r" class="joy-action-btn small">НАХИЛ R ↗</button>
+      </div>
+
+      <div class="phone-dpad-grid">
+        <div></div>
+        <button id="phone-move-up" class="phone-dpad-btn">⬆️<br><span>ВПЕРЕД</span></button>
+        <div></div>
+        <button id="phone-move-left" class="phone-dpad-btn">⬅️<br><span>ВЛІВО</span></button>
+        <button id="phone-move-down" class="phone-dpad-btn">⬇️<br><span>НАЗАД</span></button>
+        <button id="phone-move-right" class="phone-dpad-btn">➡️<br><span>ВПРАВО</span></button>
+      </div>
+      <div class="joy-stick-caption">КНОПКИ РУХУ БІЙЦЯ</div>
+    </div>
+
+    <!-- Правий блок кнопок для телефону: КНОПКИ ПРИЦІЛУ, ВОГНЮ ТА СПОРЯДЖЕННЯ -->
+    <div class="phone-right-pad">
+      <div class="joy-utility-row">
+        <button id="phone-btn-aim" class="joy-action-btn aim-btn small">🎯 ПРИЦІЛ</button>
+        <button id="phone-btn-reload" class="joy-action-btn small">🔄 ЗАРЯД</button>
+        <button id="phone-btn-check" class="joy-action-btn small">🔍 МАГАЗИН</button>
+        <button id="phone-btn-grenade" class="joy-action-btn small">💥 ГРАНАТА</button>
+      </div>
+
+      <div class="phone-aim-grid">
+        <div></div>
+        <button id="phone-look-up" class="phone-dpad-btn aim-dir">🔼<br><span>ВГОРУ</span></button>
+        <div></div>
+        <button id="phone-look-left" class="phone-dpad-btn aim-dir">◀️<br><span>ВЛІВО</span></button>
+        <button id="phone-btn-fire" class="phone-fire-center-btn">🔥<br><span>ВОГОНЬ</span></button>
+        <button id="phone-look-right" class="phone-dpad-btn aim-dir">▶️<br><span>ВПРАВО</span></button>
+        <div></div>
+        <button id="phone-look-down" class="phone-dpad-btn aim-dir">🔽<br><span>ВНИЗ</span></button>
+        <div></div>
+      </div>
+      <div class="joy-stick-caption">КНОПКИ ПРИЦІЛУ ТА ВОГНЮ (+ СВАЙП ПО ЕКРАНУ)</div>
+    </div>
+  </div>
+
   <!-- Панель тонкого налаштування оптичних ефектів, вибору режиму та світлих карт (TAB) -->
   <div id="optics-drawer" class="optics-drawer hidden">
     <div class="optics-header">
@@ -137,7 +192,7 @@
         <input type="range" id="opt-micclip" min="0.1" max="1.0" step="0.05" value="0.85" />
       </label>
       <div class="optic-actions">
-        <button id="drawer-toggle-input-btn" class="tactical-btn">КЕРУВАННЯ: КОМП'ЮТЕР (КЛАВІАТУРА+МИША)</button>
+        <button id="drawer-toggle-input-btn" class="tactical-btn">КЕРУВАННЯ: 💻 КОМП'ЮТЕР (КЛАВІАТУРА+МИША)</button>
         <button id="drawer-toggle-mode-btn" class="tactical-btn">ПЕРЕМКНУТИ РЕЖИМ: КОМАНДНИЙ БІЙ / DEATHMATCH</button>
         <button id="drawer-next-map-btn" class="tactical-btn">НАСТУПНА СВІТЛА КАРТА [M]</button>
         <button id="drawer-toggle-nvg-btn" class="tactical-btn">УВІМК/ВИМК ОКУЛЯРИ НІЧНОГО БАЧЕННЯ [N]</button>
@@ -160,15 +215,18 @@
         <b>окулярами нічного бачення [N]</b> та <b>5 тактичними картами</b> (Денний і Нічний ліс, Склад, Геліпад, Пустеля)!
       </p>
 
-      <!-- Вибір типу керування: Комп'ютер або Джойстик -->
+      <!-- Вибір типу керування: Комп'ютер, Джойстик або Телефон -->
       <div class="selector-section">
         <div class="selector-label">ОБЕРІТЬ ТИП КЕРУВАННЯ (ПРИСТРІЙ):</div>
-        <div class="mode-selector">
+        <div class="device-selector-grid">
           <button id="input-pc-btn" class="preset-btn active" data-input="pc">
-            💻 ГРАТИ НА КОМП'ЮТЕРІ (Клавіатура WASD + Миша)
+            💻 НА КОМП'ЮТЕРІ (Клавіатура WASD + Миша)
           </button>
           <button id="input-joystick-btn" class="preset-btn" data-input="joystick">
-            🎮 ГРАТИ НА ДЖОЙСТИКУ (Екранні джойстики + Геймпад Xbox / PlayStation)
+            🎮 НА ДЖОЙСТИКУ (Аналогові стіки / Геймпад)
+          </button>
+          <button id="input-phone-btn" class="preset-btn" data-input="phone">
+            📱 НА ТЕЛЕФОНІ (Кнопки керування на екрані)
           </button>
         </div>
       </div>
@@ -202,7 +260,7 @@
         <div class="feature-box">
           <h3>НОВІ МОЖЛИВОСТІ ОПЕРАЦІЇ</h3>
           <ul>
-            <li><b>Вибір керування (ПК або Джойстик):</b> класичне керування клавіатурою й мишею або режим джойстика з двома аналоговими стіками на екрані та повною підтримкою фізичних геймпадів Xbox / PlayStation.</li>
+            <li><b>3 режими керування (ПК, Джойстик, Телефон):</b> клавіатура+миша, аналогові стіки геймпада або спеціальний кнопковий інтерфейс для смартфона.</li>
             <li><b>Командний бій (5v5) та Deathmatch (60 с):</b> штурмуйте локацію разом із союзниками SWAT або змагайтесь у режимі кожен сам за себе зі зміною карти щохвилини.</li>
             <li><b>Окуляри нічного бачення [N]:</b> двотрубний зелений фосфор `AN/PVS-31` із ІЧ-лазером `PEQ-15` для бою в Нічному лісі!</li>
           </ul>
@@ -212,9 +270,8 @@
           <h3>КЕРУВАННЯ ОПЕРАТОРОМ</h3>
           <ul id="briefing-controls-list">
             <li><b>[ПК]:</b> <b>WASD</b> — рух, <b>Миша + ЛКМ/ПКМ</b> — Free-Aim вогонь/приціл, <b>Q/E</b> — нахил за ріг.</li>
-            <li><b>[ДЖОЙСТИК]:</b> <b>Лівий стік</b> — рух/спринт, <b>Правий стік</b> — Free-Aim приціл, <b>R2/L2</b> — вогонь/приціл, <b>L1/R1</b> — нахили.</li>
-            <li><b>[N] / [M] / [Z]:</b> ПНБ нічного бачення / Зміна карти / Вимкнення звуку.</li>
-            <li><b>[T] / [R]:</b> Перевірити прозорий магазин PMAG / Перезарядити зброю.</li>
+            <li><b>[ДЖОЙСТИК]:</b> <b>Лівий/Правий стік</b> — рух і Free-Aim, <b>R2/L2</b> — вогонь/приціл.</li>
+            <li><b>[ТЕЛЕФОН]:</b> <b>Ліва хрестовина кнопок</b> — рух/біг/нахил, <b>Праві кнопки + свайп</b> — приціл, вогонь, перезарядка, граната та ПНБ.</li>
           </ul>
         </div>
       </div>

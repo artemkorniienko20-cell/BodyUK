@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BODYCAM // AXON BODY 3 — Командний бій, Deathmatch & ПНБ</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <!-- Основний 3D WebGL рендер із GLSL постпроцесингом лінзи риб'ячого ока та ПНБ -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Ефект тріснутої лінзи та крапель на об'єктиві при пораненні -->
+  <div id="lens-damage-overlay" class="lens-damage hidden"></div>
+
+  <!-- Автентичний вшитий OSD-штамп нагрудної камери (AXON BODY 3) -->
+  <div id="axon-osd" class="axon-osd">
+    <div class="axon-osd-top">
+      <div class="axon-rec-line">
+        <span class="rec-dot" id="rec-dot"></span>
+        <span class="rec-label">REC</span>
+        <span class="axon-model">AXON BODY 3</span>
+        <span class="axon-serial">X81394201</span>
+      </div>
+      <div class="axon-timestamp" id="axon-timestamp">2026-10-17 12:40:00.00 +0300</div>
+      <div class="axon-meta">
+        <span id="axon-mode-label">MODE: TEAM FIGHT 5v5</span>
+        <span id="axon-map-label">MAP: AIRSOFT FOREST</span>
+        <span id="axon-nvg-label" class="nvg-off">NVG: OFF [N]</span>
+        <span id="axon-audio-label">MIC: ON [Z]</span>
+      </div>
+      <div class="axon-tactical-bar">
+        <span id="axon-score-display">SWAT (СОЮЗ): 0  |  OPFOR (ВОРОГ): 0</span>
+        <span id="axon-map-timer" class="map-timer-tag">ЗМІНА КАРТИ: 01:00 [M]</span>
+      </div>
+    </div>
+
+    <!-- Повідомлення про зміну карти або командну подію (вшите у відеопотік) -->
+    <div id="diegetic-thought" class="diegetic-thought hidden"></div>
+
+    <!-- Мінімальна підказка клавіш у нижньому лівому куті -->
+    <div id="controls-whisper" class="controls-whisper">
+      <span><b>WASD</b> Рух</span>
+      <span><b>Q / E</b> Нахил за ріг</span>
+      <span><b>ЛКМ / ПКМ</b> Вогонь / Приціл (Free-Aim)</span>
+      <span><b>N</b> Окуляри нічного бачення (ПНБ)</span>
+      <span><b>M</b> Змінити світлу карту</span>
+      <span><b>Z</b> Режим без звуку</span>
+      <span><b>T</b> Оглянути магазин</span>
+      <span><b>R</b> Перезарядка</span>
+      <span><b>F</b> Ліхтарик / ІЧ-лазер</span>
+      <span><b>G</b> Граната</span>
+      <span><b>TAB</b> Меню / Режими</span>
+    </div>
+  </div>
+
+  <!-- Панель тонкого налаштування оптичних ефектів, вибору режиму та світлих карт (TAB) -->
+  <div id="optics-drawer" class="optics-drawer hidden">
+    <div class="optics-header">
+      <div class="optics-title">ТАКТИЧНА ПАНЕЛЬ AXON BODY 3 // РЕЖИМИ, КАРТИ ТА ОПТИКА</div>
+      <button id="close-optics-btn" class="tactical-btn small">ПОВЕРНУТИСЯ В БІЙ [TAB]</button>
+    </div>
+    <div class="optics-grid">
+      <label class="optic-control">
+        <span>Дисторсія «Риб'яче око» (Fisheye): <b id="val-fisheye">0.34</b></span>
+        <input type="range" id="opt-fisheye" min="0" max="0.65" step="0.01" value="0.34" />
+      </label>
+      <label class="optic-control">
+        <span>Хроматична аберація країв: <b id="val-chroma">1.35</b></span>
+        <input type="range" id="opt-chroma" min="0" max="3.0" step="0.05" value="1.35" />
+      </label>
+      <label class="optic-control">
+        <span>ISO Зернистість та цифровий шум: <b id="val-grain">0.22</b></span>
+        <input type="range" id="opt-grain" min="0" max="0.65" step="0.01" value="0.22" />
+      </label>
+      <label class="optic-control">
+        <span>Яскравість експозиції камери: <b id="val-exposure">1.15</b></span>
+        <input type="range" id="opt-exposure" min="0.6" max="1.8" step="0.05" value="1.15" />
+      </label>
+      <label class="optic-control">
+        <span>Кут вільного прицілювання (Free-Aim): <b id="val-freeaim">1.00</b></span>
+        <input type="range" id="opt-freeaim" min="0.3" max="1.6" step="0.05" value="1.00" />
+      </label>
+      <label class="optic-control">
+        <span>Кліпінг мікрофона при пострілах: <b id="val-micclip">0.85</b></span>
+        <input type="range" id="opt-micclip" min="0.1" max="1.0" step="0.05" value="0.85" />
+      </label>
+      <div class="optic-actions">
+        <button id="drawer-toggle-mode-btn" class="tactical-btn">ПЕРЕellКНУТИ РЕЖИМ: КОМАНДНИЙ БІЙ / DEATHMATCH</button>
+        <button id="drawer-next-map-btn" class="tactical-btn">НАСТУПНА СВІТЛА КАРТА [M]</button>
+        <button id="drawer-toggle-nvg-btn" class="tactical-btn">УВІМК/ВИМК ОКУЛЯРИ НІЧНОГО БАЧЕННЯ [N]</button>
+        <button id="spawn-wave-btn" class="tactical-btn">ПЕРЕЗАПУСТИТИ РАУНД</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Стартовий екран / Тактичний термінал вибору режиму та карти -->
+  <div id="briefing-modal" class="modal-backdrop">
+    <div class="briefing-card">
+      <div class="briefing-topbar">
+        <span class="badge-live">● AXON EVIDENCE STREAM // MULTI-MODE TACTICAL SIMULATOR</span>
+        <span class="classified-tag">NVG AN/PVS-31 + AUTO MAP ROTATION (60s)</span>
+      </div>
+
+      <h1>BODYCAM <span class="sub-h1">TEAM FIGHT & DEATHMATCH EDITION</span></h1>
+      <p class="lead-desc">
+        Ультрареалістичний шутер з камерою на рівні грудей бійця, оптикою «риб'яче око», перевантаженим мікрофоном,
+        <b>окулярами нічного бачення [N]</b> та <b>4 світлими денними картами</b>, які в режимі Deathmatch автоматично змінюються щохвилини!
+      </p>
+
+      <!-- Вибір ігрового режиму -->
+      <div class="selector-section">
+        <div class="selector-label">ОБЕРІТЬ РЕЖИМ БОЮ:</div>
+        <div class="mode-selector">
+          <button id="mode-tdm-btn" class="preset-btn active" data-mode="tdm">
+            🛡️ КОМАНДНИЙ БІЙ (5v5 SWAT vs OPFOR — із союзниками)
+          </button>
+          <button id="mode-dm-btn" class="preset-btn" data-mode="dm">
+            ⚡ DEATHMATCH (Кожен сам за себе + Авто-заміна світлої карти кожні 60 с)
+          </button>
+        </div>
+      </div>
+
+      <!-- Вибір початкової локації -->
+      <div class="selector-section">
+        <div class="selector-label">ОБЕРІТЬ КАРТУ (АВТОМАТИЧНА РОТАЦІЯ ЩОХВИЛИНИ АБО КЛАВІШЕЮ [M]):</div>
+        <div class="map-selector-grid">
+          <button class="preset-btn map-btn active" data-map="0">☀️🌲 1. Денний ліс (Day Forest)</button>
+          <button class="preset-btn map-btn" data-map="1">🌙🌲 2. Нічний ліс (Night Forest — під ПНБ [N])</button>
+          <button class="preset-btn map-btn" data-map="2">🏭 3. Світлий ангар (Sunlit Warehouse)</button>
+          <button class="preset-btn map-btn" data-map="3">🚁 4. Дах хмарочоса (Rooftop Helipad)</button>
+          <button class="preset-btn map-btn" data-map="4">🏜️ 5. Пустельна база (Desert Compound)</button>
+        </div>
+      </div>
+
+      <div class="features-columns">
+        <div class="feature-box">
+          <h3>НОВІ МОЖЛИВОСТІ ОПЕРАЦІЇ</h3>
+          <ul>
+            <li><b>Командний бій (5v5):</b> бійці вашого підрозділу SWAT (у синіх шоломах із жовтими маркерами) штурмують локацію разом із вами та прикривають вогнем.</li>
+            <li><b>Deathmatch із ротацією 60 с:</b> кожну хвилину відбувається автоматичний перехід на нову світлу карту з повним оновленням позицій.</li>
+            <li><b>Окуляри нічного бачення [N]:</b> двотрубний зелений/білий фосфор `AN/PVS-31` із характерним писком запуску та зеленим ІЧ-лазером `PEQ-15` на цівці!</li>
+          </ul>
+        </div>
+
+        <div class="feature-box">
+          <h3>КЛЮЧОВІ КЛАВІШІ ОПЕРАТОРА</h3>
+          <ul>
+            <li><b>[N]</b> — Опустити / підняти окуляри нічного бачення (ПНБ).</li>
+            <li><b>[M]</b> — Примусово перемкнути на наступну світлу карту.</li>
+            <li><b>[Q / E]</b> — Тактичні нахили корпусу та камери за роги.</li>
+            <li><b>[T] / [R]</b> — Фізично заглянути в прозорий магазин / Перезарядити.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="briefing-controls-bar">
+        <button id="start-operation-btn" class="start-btn">
+          <span>● УВІМКНУТИ НАГРУДНУ КАМЕРУ ТА ВСТУПИТИ В БІЙ</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Екран завершення або підсумків -->
+  <div id="endgame-modal" class="modal-backdrop hidden">
+    <div class="endgame-card">
+      <div class="endgame-glitch-header" id="endgame-status">SIGNAL LOST // OFFICER DOWN</div>
+      <p id="endgame-subtitle" class="endgame-sub">
+        Відеопотік AXON BODY 3 перервано.
+      </p>
+      <div class="endgame-stats" id="endgame-stats"></div>
+      <div class="endgame-actions">
+        <button id="retry-operation-btn" class="start-btn">ПРОДОВЖИТИ БІЙ [ENTER / КЛІК]</button>
+        <button id="back-to-briefing-btn" class="tactical-btn">ЗМІНИТИ РЕЖИМ АБО КАРТУ</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="game.js"></script>
+</body>
+</html>

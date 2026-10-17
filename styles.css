@@ -1,0 +1,488 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #030405;
+  color: #e4e7eb;
+  font-family: 'Consolas', 'Courier New', 'Lucida Console', monospace;
+}
+
+#game-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  cursor: crosshair;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Вшитий у відеопотік OSD-штамп нагрудної камери AXON BODY 3 */
+.axon-osd {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 3.4vh 4.8vw;
+}
+
+.axon-osd-top {
+  align-self: flex-end;
+  text-align: right;
+  background: rgba(6, 8, 10, 0.48);
+  padding: 8px 14px;
+  border-radius: 4px;
+  border-right: 3px solid rgba(235, 195, 45, 0.85);
+  transform: perspective(500px) rotateY(-6deg) rotateZ(0.7deg);
+  text-shadow:
+    -1.2px 0 rgba(255, 45, 45, 0.75),
+    1.2px 0 rgba(45, 195, 255, 0.75),
+    0 0 6px rgba(255, 255, 255, 0.25);
+  filter: blur(0.2px);
+}
+
+.axon-rec-line {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #f3f4f6;
+}
+
+.rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff2a2a;
+  box-shadow: 0 0 10px #ff2a2a, 0 0 18px rgba(255, 42, 42, 0.9);
+  animation: recBlink 1.15s infinite steps(2, start);
+}
+
+@keyframes recBlink {
+  0%, 70% { opacity: 1; }
+  71%, 100% { opacity: 0.15; }
+}
+
+.rec-label {
+  color: #ff4242;
+}
+
+.axon-model {
+  color: #ffd43b;
+}
+
+.axon-serial {
+  color: #cbd5e1;
+  opacity: 0.9;
+}
+
+.axon-timestamp {
+  margin-top: 3px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  color: #ffffff;
+}
+
+.axon-meta {
+  margin-top: 4px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  font-size: 11px;
+  color: #cbd5e1;
+  letter-spacing: 1px;
+}
+
+.nvg-off {
+  color: #94a3b8;
+}
+
+.nvg-on {
+  color: #4ade80;
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(74, 222, 128, 0.8);
+}
+
+.axon-tactical-bar {
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.22);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.1px;
+  color: #f8fafc;
+}
+
+.map-timer-tag {
+  color: #ffd43b;
+  background: rgba(255, 212, 59, 0.14);
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 212, 59, 0.4);
+}
+
+/* Фізична думка бійця або сповіщення про ротацію карти */
+.diegetic-thought {
+  align-self: center;
+  margin-top: auto;
+  margin-bottom: 14vh;
+  padding: 9px 20px;
+  background: rgba(8, 10, 14, 0.76);
+  border-left: 3px solid #ffd43b;
+  border-right: 3px solid #ffd43b;
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  text-shadow: -1px 0 rgba(255, 60, 60, 0.7), 1px 0 rgba(60, 200, 255, 0.7);
+  transition: opacity 0.25s ease;
+}
+
+.controls-whisper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  max-width: 980px;
+  font-size: 11px;
+  color: rgba(241, 245, 249, 0.78);
+  background: rgba(5, 7, 10, 0.52);
+  padding: 7px 12px;
+  border-radius: 4px;
+  border-left: 2px solid rgba(255, 212, 59, 0.65);
+  transform: perspective(500px) rotateY(4deg) rotateZ(-0.4deg);
+  text-shadow: -0.8px 0 rgba(255, 0, 0, 0.55), 0.8px 0 rgba(0, 210, 255, 0.55);
+}
+
+.controls-whisper b {
+  color: #ffd43b;
+}
+
+/* Тріщина об'єктива та плями крові на лінзі при влучанні */
+.lens-damage {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+  background:
+    radial-gradient(circle at 22% 28%, rgba(155, 12, 12, 0.52) 0%, rgba(120, 5, 5, 0.2) 18%, transparent 40%),
+    radial-gradient(circle at 80% 72%, rgba(145, 10, 10, 0.48) 0%, transparent 35%),
+    linear-gradient(127deg, transparent 48.6%, rgba(255, 255, 255, 0.32) 49%, transparent 49.5%),
+    linear-gradient(38deg, transparent 62.2%, rgba(255, 255, 255, 0.22) 62.6%, transparent 63%);
+  mix-blend-mode: screen;
+}
+
+/* Налаштування оптики та мікрофона [TAB] */
+.optics-drawer {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(720px, 94vw);
+  background: rgba(10, 13, 18, 0.94);
+  border: 1px solid rgba(255, 212, 59, 0.45);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85);
+  padding: 22px 26px;
+  z-index: 30;
+  border-radius: 6px;
+  backdrop-filter: blur(8px);
+}
+
+.optics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.optics-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #ffd43b;
+  letter-spacing: 1.2px;
+}
+
+.optics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 20px;
+}
+
+.optic-control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.optic-control b {
+  color: #ffd43b;
+}
+
+.optic-control input[type="range"] {
+  accent-color: #ffd43b;
+  cursor: pointer;
+}
+
+.optic-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* Модальні вікна (Брифінг та Завершення) */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: radial-gradient(circle at center, rgba(10, 14, 20, 0.72) 0%, rgba(2, 3, 5, 0.92) 100%);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.briefing-card,
+.endgame-card {
+  width: min(920px, 96vw);
+  background: linear-gradient(180deg, rgba(16, 20, 26, 0.96) 0%, rgba(9, 11, 15, 0.98) 100%);
+  border: 1px solid rgba(255, 212, 59, 0.35);
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.9), inset 0 0 40px rgba(255, 212, 59, 0.03);
+  border-radius: 6px;
+  padding: 24px 28px;
+}
+
+.briefing-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.badge-live {
+  color: #ff4d4d;
+  font-weight: 700;
+}
+
+.classified-tag {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.12);
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+h1 {
+  font-size: clamp(24px, 3.6vw, 34px);
+  letter-spacing: 3px;
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.sub-h1 {
+  font-size: 13px;
+  color: #ffd43b;
+  letter-spacing: 2px;
+  font-weight: 600;
+  vertical-align: middle;
+  margin-left: 8px;
+}
+
+.lead-desc {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #cbd5e1;
+  margin-bottom: 14px;
+}
+
+.selector-section {
+  margin-bottom: 14px;
+}
+
+.selector-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: #ffd43b;
+  margin-bottom: 7px;
+}
+
+.mode-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.map-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.features-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.feature-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid #ffd43b;
+  padding: 12px 14px;
+  border-radius: 4px;
+}
+
+.feature-box h3 {
+  font-size: 12px;
+  letter-spacing: 1.3px;
+  color: #ffd43b;
+  margin-bottom: 8px;
+}
+
+.feature-box ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.42;
+  color: #d1d5db;
+}
+
+.feature-box li b {
+  color: #ffffff;
+}
+
+.briefing-controls-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preset-btn,
+.tactical-btn {
+  background: rgba(255, 255, 255, 0.05);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 9px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 0.7px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.16s ease;
+  text-align: left;
+}
+
+.preset-btn:hover,
+.tactical-btn:hover {
+  background: rgba(255, 212, 59, 0.14);
+  border-color: #ffd43b;
+  color: #ffffff;
+}
+
+.preset-btn.active {
+  background: rgba(255, 212, 59, 0.22);
+  border-color: #ffd43b;
+  color: #ffd43b;
+  font-weight: 700;
+}
+
+.tactical-btn.small {
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
+.start-btn {
+  width: 100%;
+  padding: 14px 22px;
+  background: linear-gradient(90deg, #b91c1c 0%, #dc2626 50%, #b91c1c 100%);
+  color: #ffffff;
+  border: 1px solid #f87171;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1.8px;
+  cursor: pointer;
+  border-radius: 4px;
+  box-shadow: 0 0 25px rgba(220, 38, 38, 0.45);
+  transition: transform 0.12s ease, box-shadow 0.18s ease;
+}
+
+.start-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 36px rgba(239, 68, 68, 0.75);
+}
+
+.endgame-card {
+  width: min(560px, 92vw);
+  text-align: center;
+}
+
+.endgame-glitch-header {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  color: #ff3b3b;
+  margin-bottom: 10px;
+  text-shadow: -2px 0 #00e5ff, 2px 0 #ff004c;
+}
+
+.endgame-sub {
+  font-size: 13px;
+  color: #cbd5e1;
+  margin-bottom: 18px;
+}
+
+.endgame-stats {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 14px;
+  border-radius: 4px;
+  margin-bottom: 18px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: #e2e8f0;
+}
+
+.endgame-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

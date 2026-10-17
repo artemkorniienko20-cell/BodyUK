@@ -97,8 +97,14 @@ class BodycamSimulator {
     this.walkCycle = 0;
     this.stepAccum = 0;
 
-    // Режим керування: 'pc' (Клавіатура WASD + Миша), 'joystick' (Стіки + Геймпад) або 'phone' (Кнопки для телефона)
+    // Режим керування: 'pc' (Клавіатура WASD + Миша), 'joystick' (Стіки + Геймпад) або 'phone' (Кнопки для телефона + Авто 60 Гц)
     this.inputMode = 'pc';
+    this.lock60Hz = false;
+    this.targetFrameIntervalMs = 1000 / 60; // 16.6667 мс = 60 Гц
+    this.lastRenderTimeMs = 0;
+    this.fpsCounterFrames = 0;
+    this.fpsCounterAccum = 0;
+    this.measuredHz = 60;
     this.joyLeftVec = new THREE.Vector2(0, 0);
     this.joyRightVec = new THREE.Vector2(0, 0);
     this.phoneLookVec = new THREE.Vector2(0, 0);
@@ -615,10 +621,21 @@ class BodycamSimulator {
   }
 
   /**
-   * Перемикання типу керування: 'pc' (Клавіатура WASD + Миша), 'joystick' (Стіки + Геймпад) або 'phone' (Кнопки для телефона)
+   * Перемикання типу керування: 'pc' (Клавіатура WASD + Миша), 'joystick' (Стіки + Геймпад) або 'phone' (Кнопки для телефона + Авто 60 Гц)
    */
   setInputMode(mode) {
     this.inputMode = (mode === 'joystick' || mode === 'phone') ? mode : 'pc';
+
+    // Автоматично встановлюємо частоту оновлення екрана 60 Гц при виборі режиму для телефона
+    this.lock60Hz = this.inputMode === 'phone';
+    const targetDpr = this.lock60Hz
+      ? Math.min(window.devicePixelRatio || 1, 1.35)
+      : Math.min(window.devicePixelRatio || 1, 2.0);
+    this.renderer.setPixelRatio(targetDpr);
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    if (this.postProcessor) {
+      this.postProcessor.setSize(window.innerWidth, window.innerHeight);
+    }
 
     const pcBtn = document.getElementById('input-pc-btn');
     const joyBtn = document.getElementById('input-joystick-btn');
@@ -627,15 +644,27 @@ class BodycamSimulator {
     const joyHud = document.getElementById('joystick-hud');
     const phoneHud = document.getElementById('phone-hud');
     const whisper = document.getElementById('controls-whisper');
+    const hzLabel = document.getElementById('axon-hz-label');
+    const phoneHzPill = document.getElementById('phone-hz-pill');
 
     if (pcBtn) pcBtn.classList.toggle('active', this.inputMode === 'pc');
     if (joyBtn) joyBtn.classList.toggle('active', this.inputMode === 'joystick');
     if (phoneBtn) phoneBtn.classList.toggle('active', this.inputMode === 'phone');
+    if (hzLabel) {
+      hzLabel.classList.toggle('locked-60hz', this.lock60Hz);
+      hzLabel.textContent = this.lock60Hz
+        ? 'DISPLAY: 60Hz LOCK (MOBILE)'
+        : 'DISPLAY: NATIVE Hz';
+    }
+    if (phoneHzPill) {
+      phoneHzPill.textContent = '⚡ ЕКРАН: 60 ГЦ (АВТО)';
+    }
+
     if (drawerInputBtn) {
       if (this.inputMode === 'joystick') {
         drawerInputBtn.textContent = 'КЕРУВАННЯ: 🎮 ДЖОЙСТИК (СТІКИ / ГЕЙМПАД)';
       } else if (this.inputMode === 'phone') {
-        drawerInputBtn.textContent = 'КЕРУВАННЯ: 📱 ТЕЛЕФОН (КНОПКИ НА ЕКРАНІ)';
+        drawerInputBtn.textContent = 'КЕРУВАННЯ: 📱 ТЕЛЕФОН (КНОПКИ // АВТО 60 ГЦ)';
       } else {
         drawerInputBtn.textContent = "КЕРУВАННЯ: 💻 КОМП'ЮТЕР (КЛАВІАТУРА+МИША)";
       }
@@ -660,6 +689,7 @@ class BodycamSimulator {
       if (whisper) whisper.classList.add('hidden');
       this.joyLeftVec.set(0, 0);
       this.joyRightVec.set(0, 0);
+      this.showDiegeticThought('РЕЖИМ ТЕЛЕФОНА: ЕКРАН АВТОМАТИЧНО ПЕРЕВЕДЕНО НА 60 ГЦ (60 FPS)');
     } else {
       this.canvas.style.cursor = 'crosshair';
       if (joyHud) joyHud.classList.add('hidden');
@@ -2077,11 +2107,43 @@ class BodycamSimulator {
     if (el) el.textContent = stamp;
   }
 
-  animate() {
+  animate(nowMs = performance.now()) {
     requestAnimationFrame(this.animate);
+
+    // Якщо вибрано режим для телефона — автоматично обмежуємо частоту кадрів екрана до 60 Гц (16.67 мс)
+    if (this.lock60Hz) {
+      const deltaMs = nowMs - this.lastRenderTimeMs;
+      if (deltaMs < this.targetFrameIntervalMs - 0.45) {
+        return;
+      }
+      this.lastRenderTimeMs = nowMs - (deltaMs % this.targetFrameIntervalMs);
+    } else {
+      this.lastRenderTimeMs = nowMs;
+    }
 
     const dt = Math.min(this.clock.getDelta(), 0.05);
     const elapsed = this.clock.getElapsedTime();
+
+    // Підрахунок реальної частоти Гц / FPS для OSD-штампа камери та мобільної панелі
+    this.fpsCounterFrames++;
+    this.fpsCounterAccum += dt;
+    if (this.fpsCounterAccum >= 0.5) {
+      const rawHz = Math.round(this.fpsCounterFrames / this.fpsCounterAccum);
+      this.measuredHz = this.lock60Hz ? Math.min(60, rawHz || 60) : (rawHz || 60);
+      this.fpsCounterFrames = 0;
+      this.fpsCounterAccum = 0;
+
+      const hzLabel = document.getElementById('axon-hz-label');
+      if (hzLabel) {
+        hzLabel.textContent = this.lock60Hz
+          ? `DISPLAY: 60Hz LOCK (${this.measuredHz} FPS)`
+          : `DISPLAY: ${this.measuredHz}Hz`;
+      }
+      const phoneHzPill = document.getElementById('phone-hz-pill');
+      if (phoneHzPill && this.lock60Hz) {
+        phoneHzPill.textContent = `⚡ ЕКРАН: 60 ГЦ (${this.measuredHz} FPS)`;
+      }
+    }
 
     this.updateAxonTimestamp();
 

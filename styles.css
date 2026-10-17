@@ -758,6 +758,7 @@ h1 {
 }
 
 .phone-dpad-btn.pressed,
+.phone-dpad-btn.active,
 .phone-dpad-btn:active {
   background: rgba(255, 212, 59, 0.34);
   border-color: #ffd43b;
@@ -787,9 +788,19 @@ h1 {
   letter-spacing: 0.6px;
 }
 
+.phone-fire-center-btn.active,
 .phone-fire-center-btn:active {
   transform: scale(0.92);
   background: #dc2626;
 }
 
+.hz-badge {
+  color: #94a3b8;
+  transition: color 0.2s ease, text-shadow 0.2s ease;
+}
 
+.hz-badge.locked-60hz {
+  color: #4ade80;
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(74, 222, 128, 0.45);
+}

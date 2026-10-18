@@ -314,14 +314,78 @@ class BodycamSimulator {
     this.muzzleLight.position.set(0, 0.012, -0.92);
     this.weaponMeshGroup.add(this.muzzleLight);
 
-    // Тактичний ліхтарик / ІЧ-підсвітка для ПНБ
-    this.flashlight = new THREE.SpotLight(0xf2f7ff, 4.5, 28, Math.PI / 6.0, 0.48, 1.3);
-    this.flashlight.position.set(0.035, 0.015, -0.58);
+    // Надпотужний тактичний ліхтарик SureFire M640DF (1500 люмен: центральний прожектор + широке бокове засвічення)
+    this.flashlightMaxIntensity = 42.0;
+    this.flashlightSpillIntensity = 14.0;
+
+    // 3D-корпус підствольного ліхтаря та яскрава лінза
+    const lightBody = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.013, 0.011, 0.11, 12),
+      gunMetal
+    );
+    lightBody.rotation.x = Math.PI / 2;
+    lightBody.position.set(0.036, 0.015, -0.54);
+    this.weaponMeshGroup.add(lightBody);
+
+    this.flashlightLensMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const lightLens = new THREE.Mesh(new THREE.CircleGeometry(0.011, 12), this.flashlightLensMat);
+    lightLens.position.set(0.036, 0.015, -0.596);
+    lightLens.rotation.y = Math.PI;
+    this.weaponMeshGroup.add(lightLens);
+
+    // Візуальний об'ємний конус світла в тумані/пилу
+    const beamConeGeo = new THREE.ConeGeometry(0.75, 9.5, 20, 1, true);
+    beamConeGeo.rotateX(Math.PI / 2);
+    beamConeGeo.translate(0, 0, -4.75);
+    this.flashlightBeamCone = new THREE.Mesh(
+      beamConeGeo,
+      new THREE.MeshBasicMaterial({
+        color: 0xe8f4ff,
+        transparent: true,
+        opacity: 0.055,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      })
+    );
+    this.flashlightBeamCone.position.set(0.036, 0.015, -0.60);
+    this.weaponMeshGroup.add(this.flashlightBeamCone);
+
+    // 1. Центральний далекобійний промінь (Hotspot — пробиває темряву на 70 метрів)
+    this.flashlight = new THREE.SpotLight(
+      0xf4f9ff,
+      this.flashlightMaxIntensity,
+      70,
+      Math.PI / 4.4,
+      0.38,
+      0.88
+    );
+    this.flashlight.position.set(0.036, 0.015, -0.60);
+    this.flashlight.castShadow = true;
+    this.flashlight.shadow.mapSize.width = 1024;
+    this.flashlight.shadow.mapSize.height = 1024;
+    this.flashlight.shadow.camera.near = 0.25;
+    this.flashlight.shadow.camera.far = 65;
+    this.flashlight.shadow.bias = -0.0005;
+
+    // 2. Широке периферійне засвічення (Spill — освітлює простір навколо бійця)
+    this.flashlightSpill = new THREE.SpotLight(
+      0xdcebff,
+      this.flashlightSpillIntensity,
+      34,
+      Math.PI / 2.2,
+      0.78,
+      1.05
+    );
+    this.flashlightSpill.position.set(0.036, 0.015, -0.60);
+
     this.flashlightTarget = new THREE.Object3D();
-    this.flashlightTarget.position.set(0.035, 0.015, -8.0);
+    this.flashlightTarget.position.set(0.036, 0.015, -12.0);
     this.weaponMeshGroup.add(this.flashlight);
+    this.weaponMeshGroup.add(this.flashlightSpill);
     this.weaponMeshGroup.add(this.flashlightTarget);
     this.flashlight.target = this.flashlightTarget;
+    this.flashlightSpill.target = this.flashlightTarget;
   }
 
   /**
@@ -772,6 +836,26 @@ class BodycamSimulator {
     );
   }
 
+  toggleFlashlight() {
+    this.flashlightOn = !this.flashlightOn;
+    this.flashlight.intensity = this.flashlightOn ? this.flashlightMaxIntensity : 0.0;
+    if (this.flashlightSpill) {
+      this.flashlightSpill.intensity = this.flashlightOn ? this.flashlightSpillIntensity : 0.0;
+    }
+    if (this.flashlightBeamCone) {
+      this.flashlightBeamCone.visible = this.flashlightOn;
+    }
+    if (this.flashlightLensMat) {
+      this.flashlightLensMat.color.setHex(this.flashlightOn ? 0xffffff : 0x22262b);
+    }
+    this.audio.playWeaponHandling('dry');
+    this.showDiegeticThought(
+      this.flashlightOn
+        ? 'ТАКТИЧНИЙ ПРОЖЕКТОР SUREFIRE (1500 ЛЮМЕН): УВІМКНЕНО [F]'
+        : 'ТАКТИЧНИЙ ПРОЖЕКТОР SUREFIRE: ВИМКНЕНО [F]'
+    );
+  }
+
   bindEvents() {
     window.addEventListener('resize', () => {
       this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -820,9 +904,7 @@ class BodycamSimulator {
         this.triggerAmmoCheck();
       }
       if (e.code === 'KeyF') {
-        this.flashlightOn = !this.flashlightOn;
-        this.flashlight.intensity = this.flashlightOn ? 4.5 : 0.0;
-        this.audio.playWeaponHandling('dry');
+        this.toggleFlashlight();
       }
       if (e.code === 'KeyG') {
         this.throwFlashbang();
@@ -986,11 +1068,7 @@ class BodycamSimulator {
     bindBtn('joy-btn-reload', () => this.triggerReload());
     bindBtn('joy-btn-check', () => this.triggerAmmoCheck());
     bindBtn('joy-btn-grenade', () => this.throwFlashbang());
-    bindBtn('joy-btn-light', () => {
-      this.flashlightOn = !this.flashlightOn;
-      this.flashlight.intensity = this.flashlightOn ? 4.5 : 0.0;
-      this.audio.playWeaponHandling('dry');
-    });
+    bindBtn('joy-btn-light', () => this.toggleFlashlight());
     bindBtn('joy-btn-nvg', () => this.toggleNightVision());
     bindBtn('joy-btn-map', () => this.rotateToNextBrightMap(true));
     bindBtn('joy-btn-mute', () => this.toggleMuteAudio());
@@ -1131,11 +1209,7 @@ class BodycamSimulator {
     bindTapBtn('phone-btn-menu', () => this.toggleOpticsDrawer());
     bindTapBtn('phone-btn-nvg', () => this.toggleNightVision());
     bindTapBtn('phone-btn-map', () => this.rotateToNextBrightMap(true));
-    bindTapBtn('phone-btn-light', () => {
-      this.flashlightOn = !this.flashlightOn;
-      this.flashlight.intensity = this.flashlightOn ? 4.5 : 0.0;
-      this.audio.playWeaponHandling('dry');
-    });
+    bindTapBtn('phone-btn-light', () => this.toggleFlashlight());
     bindTapBtn('phone-btn-mute', () => this.toggleMuteAudio());
     bindTapBtn('phone-btn-fullscreen', () => {
       if (!document.fullscreenElement) {
@@ -1246,8 +1320,7 @@ class BodycamSimulator {
 
     // Хрестовина D-Pad: Up (12) Ліхтар, Down (13) Звук, Left (14) ПНБ, Right (15) Карта, Start (9) Меню
     if (justPressed(12)) {
-      this.flashlightOn = !this.flashlightOn;
-      this.flashlight.intensity = this.flashlightOn ? 4.5 : 0.0;
+      this.toggleFlashlight();
     }
     if (justPressed(13)) this.toggleMuteAudio();
     if (justPressed(14)) this.toggleNightVision();
